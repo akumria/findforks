@@ -3,6 +3,7 @@
 import argparse
 import json
 import subprocess
+import urllib.error
 import urllib.parse
 import urllib.request
 
@@ -23,7 +24,11 @@ def find_forks(remote):
 
     GITHUB_FORK_URL = u"https://api.github.com/repos/{username}/{project}/forks"
 
-    resp = urllib.request.urlopen(GITHUB_FORK_URL.format(username=username, project=project))
+    try:
+        resp = urllib.request.urlopen(GITHUB_FORK_URL.format(username=username, project=project))
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            raise StopIteration
     
     resp_json = json.loads(resp.read())
     for fork in resp_json:
