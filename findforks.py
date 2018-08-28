@@ -19,22 +19,7 @@ def find_forks(remote):
 
     repo_url_stdout = repo_url.stdout.decode()
 
-    if repo_url_stdout.startswith("git@github.com"):
-        # convert git@github.com:akumria/all_forks.git to
-        # service: git@github.com
-        # username: akumria
-        # project = all_forks
-        (service, repo) = repo_url_stdout.split(":")
-        (username, project_git) = repo.split("/")
-        project = project_git[:project_git.find(".")]
-    elif repo_url_stdout.startswith("http"):
-        # convert https://github.com/akumria/all_forks.git to
-        # service: git@github.com
-        # username: akumria
-        # project = all_forks
-        o = urllib.parse.urlparse(repo_url_stdout)
-        (_, username, project_git) = o.path.split("/")
-        project = project_git[:project_git.find(".")]
+    (username, project) = parse_git_remote_output(repo_url_stdout)
 
     GITHUB_FORK_URL = u"https://api.github.com/repos/{username}/{project}/forks"
 
@@ -44,6 +29,37 @@ def find_forks(remote):
     for fork in resp_json:
         yield (fork['owner']['login'], fork['ssh_url'])
 
+
+def parse_git_remote_output(repo_url):
+    """
+    Given a repository URL, split it into its component parts.
+
+    convert git@github.com:akumria/all_forks.git to
+        service: git@github.com
+        username: akumria
+        project = all_forks
+
+    convert https://github.com/akumria/all_forks.git to
+        service: git@github.com
+        username: akumria
+        project = all_forks
+    """
+
+    if repo_url.startswith("git@github.com"):
+        (service, repo) = repo_url.split(":")
+        (username, project_git) = repo.split("/")
+        project = project_git[:project_git.find(".")]
+        return (username, project)
+
+    if repo_url.startswith("http"):
+        o = urllib.parse.urlparse(repo_url)
+        (_, username, project_git) = o.path.split("/")
+        # also handle the case where there is no '.git'
+        if project_git.find(".") < 0:
+            project = project_git
+        else:
+            project = project_git[:project_git.find(".")]
+        return (username, project)
 
 def setup_remote(remote, repository_url):
     """
