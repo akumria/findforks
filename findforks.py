@@ -3,6 +3,7 @@
 import argparse
 import json
 import subprocess
+import urllib.parse
 import urllib.request
 
 
@@ -16,13 +17,24 @@ def find_forks(remote):
         stdout=subprocess.PIPE
     )
 
-    # convert git@github.com:akumria/all_forks.git to
-    # service: git@github.com
-    # username: akumria
-    # project = all_forks
-    (service, repo) = str(repo_url.stdout).split(":")
-    (username, project_git) = repo.split("/")
-    project = project_git[:project_git.find(".")]
+    repo_url_stdout = repo_url.stdout.decode()
+
+    if repo_url_stdout.startswith("git@github.com"):
+        # convert git@github.com:akumria/all_forks.git to
+        # service: git@github.com
+        # username: akumria
+        # project = all_forks
+        (service, repo) = repo_url_stdout.split(":")
+        (username, project_git) = repo.split("/")
+        project = project_git[:project_git.find(".")]
+    elif repo_url_stdout.startswith("http"):
+        # convert https://github.com/akumria/all_forks.git to
+        # service: git@github.com
+        # username: akumria
+        # project = all_forks
+        o = urllib.parse.urlparse(repo_url_stdout)
+        (_, username, project_git) = o.path.split("/")
+        project = project_git[:project_git.find(".")]
 
     GITHUB_FORK_URL = u"https://api.github.com/repos/{username}/{project}/forks"
 
