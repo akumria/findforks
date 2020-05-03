@@ -8,11 +8,12 @@ import urllib.parse
 import urllib.request
 
 
-
 def find_forks(remote):
     """
     Query the GitHub API for all forks of a repository.
     """
+    resp_json = []
+
     repo_url = subprocess.run(
         ["git", "remote", "get-url", remote],
         stdout=subprocess.PIPE
@@ -29,10 +30,35 @@ def find_forks(remote):
     except urllib.error.HTTPError as e:
         if e.code == 404:
             raise StopIteration
-    
-    resp_json = json.loads(resp.read())
+
+    resp_json += json.loads(resp.read())
+
+    while github_resp_next_page(resp):
+        resp = urllib.request.urlopen(github_resp_next_page(resp))
+        resp_json += json.loads(resp.read())
+
     for fork in resp_json:
         yield (fork['owner']['login'], fork['ssh_url'])
+
+
+def github_resp_next_page(resp):
+    """
+    Check to see if the GitHub response has a next link.
+
+    If the response, look for the 'link' header and see if
+    there is a value pointed to by next.
+    """
+    link_header = resp.getheader(u"link")
+
+    if not link_header:
+        return None
+
+    rel_next = u'rel="next"'
+    for link in link_header.split(u","):
+        if rel_next in link:
+            return link[link.find(u"<") + 1:link.rfind(u">")]
+
+    return None
 
 
 def parse_git_remote_output(repo_url):
@@ -65,6 +91,7 @@ def parse_git_remote_output(repo_url):
         else:
             project = project_git[:project_git.find(".")]
         return (username, project)
+
 
 def setup_remote(remote, repository_url):
     """
